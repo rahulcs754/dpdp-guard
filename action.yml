@@ -1,0 +1,98 @@
+name: DPDP Guard
+description: Find personal data in a JS/TS codebase, write a DPDP data register, and comment on PRs that add new personal data.
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  path:
+    description: Folder to scan, relative to the repo root.
+    default: "."
+  fail-on:
+    description: Fail the job when a new gap at this level or higher is found (high, medium, low). Empty means never fail.
+    default: ""
+  comment:
+    description: Post or update one PR comment listing new personal data and gaps.
+    default: "true"
+  ai:
+    description: Ask Claude for purpose and retention suggestions. Needs the anthropic-api-key input.
+    default: "false"
+  anthropic-api-key:
+    description: Anthropic API key, only used when ai is true.
+    default: ""
+  github-token:
+    description: Token used to post the PR comment.
+    default: ${{ github.token }}
+
+outputs:
+  report-dir:
+    description: Folder with dpdp-register.md, dpdp-register.json, dpdp-gaps.md and dpdp-pr-comment.md.
+    value: ${{ steps.scan.outputs.report-dir }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Build DPDP Guard
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: npm ci --no-audit --no-fund && npm run build
+
+    - name: Scan
+      id: scan
+      shell: bash
+      env:
+        ANTHROPIC_API_KEY: ${{ inputs.anthropic-api-key }}
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_AI: ${{ inputs.ai }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        out="$RUNNER_TEMP/dpdp-guard"
+        args=(scan "$INPUT_PATH" --out "$out")
+        if [ -n "$BASE_SHA" ]; then
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" 2>/dev/null || true
+          args+=(--diff "$BASE_SHA")
+        fi
+        [ "$INPUT_AI" = "true" ] && args+=(--ai)
+        [ -n "$INPUT_FAIL_ON" ] && args+=(--fail-on "$INPUT_FAIL_ON")
+        echo "report-dir=$out" >> "$GITHUB_OUTPUT"
+        set +e
+        node "$ACTION_PATH/dist/cli.js" "${args[@]}"
+        echo "exit-code=$?" >> "$GITHUB_OUTPUT"
+        cat "$out/dpdp-gaps.md" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on PR
+      if: inputs.comment == 'true' && github.event.pull_request.number
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+        OUT: ${{ steps.scan.outputs.report-dir }}
+      run: |
+        body_file="$OUT/dpdp-pr-comment.md"
+        existing=$(gh api "repos/$REPO/issues/$PR/comments" --paginate -q '.[] | select(.body | startswith("<!-- dpdp-guard -->")) | .id' | head -n1)
+        if [ ! -s "$body_file" ]; then
+          if [ -n "$existing" ]; then
+            printf '<!-- dpdp-guard -->\nDPDP Guard: no new personal data or gaps in this PR.\n' > "$body_file"
+          else
+            echo "No new personal data in this PR."; exit 0
+          fi
+        fi
+        if [ -n "$existing" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$existing" -F body=@"$body_file" > /dev/null
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@"$body_file" > /dev/null
+        fi
+
+    - name: Fail on gaps
+      if: steps.scan.outputs.exit-code != '0'
+      shell: bash
+      run: |
+        echo "DPDP Guard found new gaps at or above the fail-on level."
+        exit 1

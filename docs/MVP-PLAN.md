@@ -37,8 +37,8 @@ TypeScript (Node 22, ESM), ts-morph, @mrleebo/prisma-ast, commander, @anthropic-
 1. PII dictionary + JSX/Zod scanner + fixture tests (done)
 2. Prisma/Drizzle scanner + register output (Prisma done, Drizzle next)
 3. Gap rules 1–6 (done, plus DPDP-07 Aadhaar storage)
-4. `--ai` classification
-5. GitHub Action PR comment (only new fields in the diff)
+4. `--ai` classification (done: purpose, retention and basis suggestions)
+5. GitHub Action PR comment (only new fields in the diff) (done)
 6. Run on 2 open-source Next.js apps, write README with screenshots
 
 ## Later

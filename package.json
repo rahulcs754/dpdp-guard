@@ -1,0 +1,44 @@
+{
+  "name": "dpdp-guard",
+  "version": "0.1.0",
+  "description": "Scan a Next.js/Node codebase for personal data and write an India DPDP data register and gap report.",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "bin": {
+    "dpdp-guard": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsc -p tsconfig.build.json && node dist/cli.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "dpdp",
+    "privacy",
+    "india",
+    "pii",
+    "nextjs",
+    "scanner"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@mrleebo/prisma-ast": "^0.16.0",
+    "commander": "^15.0.0",
+    "ts-morph": "^28.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.8"
+  }
+}

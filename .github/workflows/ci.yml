@@ -20,3 +20,15 @@ jobs:
       - run: npm run build
       - name: Scan the sample app
         run: node dist/cli.js scan fixtures/sample-app --out scan-output
+
+  action:
+    # Runs this repo's own action on the sample app, so the action itself is tested on every PR.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          path: fixtures/sample-app

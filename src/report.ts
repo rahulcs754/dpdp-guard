@@ -58,3 +58,26 @@ export function summaryText(r: ScanResult): string {
   if (r.gaps.length > 10) lines.push(`  ... ${r.gaps.length - 10} more in dpdp-gaps.md`);
   return lines.join("\n");
 }
+
+export const COMMENT_MARKER = "<!-- dpdp-guard -->";
+
+/** Short PR comment for what a diff added. Empty string when nothing new. */
+export function prCommentMarkdown(r: ScanResult): string {
+  if (r.register.length === 0 && r.gaps.length === 0) return "";
+  const out = [COMMENT_MARKER, "### DPDP Guard: new personal data in this PR", ""];
+  if (r.register.length) {
+    out.push("| Data element | Category | Where | Purpose |", "|---|---|---|---|");
+    for (const row of r.register) {
+      const where = [...row.collectedAt, ...row.storedIn].slice(0, 2).map(loc).join(", ") || "-";
+      out.push(`| ${cell(row.label)} | ${row.category} | ${where} | ${cell(row.purpose)} |`);
+    }
+    out.push("", "Please add a purpose and retention for each new element to the data register.", "");
+  }
+  if (r.gaps.length) {
+    out.push("**Gaps on changed lines**", "");
+    for (const g of r.gaps) out.push(`- **${g.severity}** ${g.rule} ${g.title} at ${loc(g)}: ${g.message}`);
+    out.push("");
+  }
+  out.push("<sub>Heuristic check, not legal advice.</sub>", "");
+  return out.join("\n");
+}

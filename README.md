@@ -2,7 +2,7 @@
 
 Scan a Next.js or Node.js codebase for personal data and get the data register and gap report that India's **Digital Personal Data Protection (DPDP) Act** asks for.
 
-> Status: MVP CLI working (scanners, register, 7 gap rules). `--ai` and the GitHub Action PR comment are next. See [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
+> Status: MVP CLI working (scanners, register, 7 gap rules), optional `--ai` suggestions, and a GitHub Action that comments on PRs. See [docs/MVP-PLAN.md](docs/MVP-PLAN.md).
 
 ## Why
 - Consent Manager rules apply from **14 Nov 2026**. Consent, security, rights and breach duties apply from **14 May 2027**.
@@ -21,7 +21,31 @@ npm install && npm run build
 node dist/cli.js scan path/to/your-app              # writes dpdp-register.md/.json + dpdp-gaps.md
 node dist/cli.js scan . --out reports --fail-on high   # CI: exit 1 on high gaps
 node dist/cli.js scan . --json                         # print JSON only
+node dist/cli.js scan . --diff origin/main             # also write dpdp-pr-comment.md for new items only
+ANTHROPIC_API_KEY=... node dist/cli.js scan . --ai     # Claude suggests purpose + retention for TODO rows
 ```
+
+`--ai` sends element names, categories and at most 3 single source lines per element to Claude (`claude-opus-5-5`). It never sends whole files. Suggestions are marked `AI:` in the register so a reviewer can spot them.
+
+## GitHub Action
+```yaml
+# .github/workflows/dpdp.yml
+on: pull_request
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  dpdp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rahulcs754/dpdp-guard@main
+        with:
+          fail-on: high          # optional: fail on new high gaps
+          # ai: "true"
+          # anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+On a PR it scans the repo, keeps only personal data and gaps on lines the PR added, and posts (or updates) one comment. The full gap report goes to the job summary.
 Once published: `npx dpdp-guard scan .`
 
 Try it on the planted sample app: `npm run dev -- scan fixtures/sample-app --out /tmp/dpdp`.
